@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+message HelloWorld
+{
+    required string name = 1;
+}
+
+message LogData
+{
+    required string log = 1;
+}
