@@ -11,7 +11,11 @@
 using namespace std;
 using namespace ipc::fdbus;
 static CBaseWorker main_worker;
-static const int METHOD_ID = 1;
+enum MethodId
+{
+    METHOD_ID = 1,
+    LOG_METHOD_ID = 2
+};
 
 class HelloClient : public CBaseClient
 {
@@ -25,7 +29,7 @@ public:
     void callServwerSync()
     {
         HelloWorld hlwd;
-        hlwd.set_name("minminlittleshrimp");
+        hlwd.set_name("Venom");
         CFdbProtoMsgBuilder builder(hlwd);
         CBaseJob::Ptr ref(new CBaseMessage(1));
         invoke(ref, builder);
@@ -50,15 +54,21 @@ public:
     void callServwerAsync()
     {
         HelloWorld hlwd;
-        hlwd.set_name("minminlittleshrimp");
+        hlwd.set_name("Venom");
         CFdbProtoMsgBuilder builder(hlwd);
         invoke(METHOD_ID, builder);
     }
 
 protected:
-    void onOnline(const CFdbOnlineInfo &info)
+    void onOnline(const CFdbOnlineInfo &info) override
     {
         cout << "Connected to the Server" << endl;
+
+        // Subscribe to LOG_METHOD_ID broadcasts
+        CFdbMsgSubscribeList subscribe_list;
+        addNotifyItem(subscribe_list, LOG_METHOD_ID);
+        subscribe(subscribe_list);
+
         callServwerAsync();
     }
 
@@ -93,6 +103,40 @@ protected:
                 callServwerSync();
             }
             break;
+            case LOG_METHOD_ID:
+            {
+                LogData log_data;
+                CFdbProtoMsgParser parser(log_data);
+                if (msg->deserialize(parser))
+                {
+                    std::cout << "Log from Server: " << log_data.log() << std::endl;
+                }
+            }
+            break;
+            default:
+                break;
+        }
+    }
+
+    void onBroadcast(CBaseJob::Ptr &msg_ref) override
+    {
+        auto msg = castToMessage<CFdbMessage *>(msg_ref);
+        switch (msg->code())
+        {
+            case LOG_METHOD_ID:
+            {
+                LogData log_data;
+                CFdbProtoMsgParser parser(log_data);
+                if (msg->deserialize(parser))
+                {
+                    std::cout << "Log from Server (broadcast): " << log_data.log() << std::endl;
+                }
+                else
+                {
+                    std::cout << "Failed to parse log broadcast!" << std::endl;
+                }
+                break;
+            }
             default:
                 break;
         }

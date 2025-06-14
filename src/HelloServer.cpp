@@ -6,11 +6,18 @@
 #include <fdbus/cJSON/cJSON.h>
 #include <fdbus/CFdbCJsonMsgBuilder.h>
 #include "HelloWorld.pb.h"
+#include <thread>
+#include <chrono>
 
 using namespace std;
 using namespace ipc::fdbus;
 static CBaseWorker main_worker;
-static const int METHOD_ID = 1;
+
+enum MethodId
+{
+    METHOD_ID = 1,
+    LOG_METHOD_ID = 2
+};
 
 class HelloServer : public CBaseServer
 {
@@ -19,6 +26,20 @@ public:
         : CBaseServer(name, work)
     {
         // Empty Constructor
+    }
+
+    // Periodically broadcast log messages
+    void logLoop()
+    {
+        int count = 0;
+        while (true)
+        {
+            LogData log_data;
+            log_data.set_log("Periodic log message #" + std::to_string(count++));
+            CFdbProtoMsgBuilder log_builder(log_data);
+            this->broadcast(LOG_METHOD_ID, log_builder);
+            std::this_thread::sleep_for(std::chrono::seconds(1)); // 1 second interval
+        }
     }
 
 protected:
@@ -30,7 +51,7 @@ protected:
     {
         cout << "Connect to the Client" << endl;
     }
-    void onInvoke(CBaseJob:: Ptr &msg_ref)
+    void onInvoke(CBaseJob::Ptr &msg_ref)
     {
         auto msg = castToMessage<CFdbMessage *>(msg_ref);
         static int32_t elapse_time = 0;
@@ -45,10 +66,18 @@ protected:
                     return;
                 }
                 cout << "Client name " << client.name() << endl;
+
+                // Reply with HelloWorld
                 HelloWorld server;
                 server.set_name("Dr.Mint");
                 CFdbProtoMsgBuilder builder(server);
                 msg->reply(msg_ref, builder);
+
+                // Send a log message with LOG_METHOD_ID
+                LogData log_data;
+                log_data.set_log("Hello from server log!");
+                CFdbProtoMsgBuilder log_builder(log_data);
+                this->broadcast(LOG_METHOD_ID, log_builder);
             }
             break;
             default:
@@ -87,6 +116,8 @@ int main(int argc, char *argv[])
         server->enableUDP(true);
         server->setExportableLevel(FDB_EXPORTABLE_SITE);
         server->bind(url.c_str());
+
+        std::thread([server](){ server->logLoop(); }).detach();
     }
 
     // WorkThread
