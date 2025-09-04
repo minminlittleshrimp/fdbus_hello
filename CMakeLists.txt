@@ -76,3 +76,9 @@ target_link_libraries(fdbxHelloClient PRIVATE
   fdbus fdbus-clib
   protobuf::libprotobuf
 )
+
+include(GNUInstallDirs)
+install(TARGETS fdbxHelloServer fdbxHelloClient
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${PROTO_HDR}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
